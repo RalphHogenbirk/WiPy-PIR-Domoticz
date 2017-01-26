@@ -6,37 +6,31 @@ from domoticz import Domoticz
 wl = WLAN(WLAN.STA)
 d = Domoticz("<ip>", 8080 ,"<basic hash>")
 
+#config
+hold_time_sec = 10
+
 #flags
-running = True
-button_pressed = False
-pir_triggered = False
+last_trigger = -10 
 
-#callbacks
-def pirTriggered(pin):
-    global pir_triggered
-    pir_triggered = True
-
-def buttonPressed(pin):
-    global button_pressed
-    button_pressed = True
-
-
-pir = Pin('GP4',mode=Pin.IN,pull=Pin.PULL_UP)
-pir.irq(trigger=Pin.IRQ_RISING, handler=pirTriggered)
-    
-pir = Pin('GP17',mode=Pin.IN,pull=Pin.PULL_UP)
-pir.irq(trigger=Pin.IRQ_FALLING, handler=buttonPressed)
+pir = Pin('G4',mode=Pin.IN,pull=Pin.PULL_UP)
 
 # main loop
 print("Starting main loop")
-while running:
+while True:
+    if pir() == 1:
+        if time.time() - last_trigger > hold_time_sec:
+            last_trigger = time.time()
+            print("Presence detected, sending HTTP request")
+            try:
+                return_code = d.setVariable('Presence:LivingRoom','1')
+                print("Request result: "+str(return_code))
+            except Exception as e:
+                print("Request failed")
+                print(e)
+    else:
+        last_trigger = 0
+        print("No presence")
+
     time.sleep_ms(500)
-    if pir_triggered:
-        pir_triggered = False
-        result = d.setVariable('Presence:LivingRoom','1')
-        print("HTTP Status: "+str(result))
-    elif button_pressed:
-        button_pressed = False
-        running = False
 
 print("Exited main loop")
